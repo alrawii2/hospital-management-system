@@ -1,0 +1,46 @@
+# Normalize line endings so the same checkout works on Windows, macOS, and Linux.
+# Without this, Windows clones convert shell scripts to CRLF and break `#!/bin/sh`
+# when those same files are mounted or copied into a Linux container.
+
+# Default: let Git auto-detect text vs binary, normalize text to LF in the repo.
+* text=auto eol=lf
+
+# Force LF on anything that gets executed by a POSIX shell or a Linux container.
+*.sh        text eol=lf
+*.bash      text eol=lf
+Dockerfile* text eol=lf
+*.dockerignore text eol=lf
+entrypoint* text eol=lf
+
+# Source code — keep LF in repo; Git checks out with the user's native eol on
+# Windows only when text=auto and core.autocrlf=true. Pinning eol=lf here makes
+# checkouts byte-identical across OSes, which prevents flaky diffs.
+*.py        text eol=lf
+*.js        text eol=lf
+*.jsx       text eol=lf
+*.ts        text eol=lf
+*.tsx       text eol=lf
+*.json      text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.toml      text eol=lf
+*.md        text eol=lf
+*.html      text eol=lf
+*.css       text eol=lf
+*.conf      text eol=lf
+*.puml      text eol=lf
+
+# Windows-only scripts — keep CRLF so cmd.exe parses them correctly.
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+*.ps1       text eol=crlf
+
+# Binary assets — never touch.
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.pdf       binary
+*.docx      binary
+*.sqlite3   binary

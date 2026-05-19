@@ -34,35 +34,154 @@ communicating with a Django 5 + Django REST Framework backend.
 
 ---
 
+## Requirements
+
+Install these before running any of the quick-start blocks below.
+
+| Tool          | Version          | Notes                                              |
+|---------------|------------------|----------------------------------------------------|
+| Python        | **3.12.x**       | Pinned via `.python-version`. 3.11 also works.    |
+| pip           | bundled with Python | `python -m pip --version` to confirm            |
+| Node.js       | **≥ 20.19 LTS**  | Pinned via `Frontend/hospital-frontend/.nvmrc`     |
+| npm           | ≥ 10             | Ships with Node 20.                                |
+| Git           | any recent       | 2.40+ recommended for `.gitattributes` support     |
+| Docker Engine | 24+ (Phase 2)    | Only needed for the full Docker stack              |
+| Docker Compose | v2 (Phase 2)    | `docker compose` (not `docker-compose`)            |
+
+Optional but useful: a virtual-environment manager (`venv`, `pyenv`, `conda`)
+and Node version manager (`nvm`, `fnm`, `volta`).
+
+---
+
 ## Quick start (Phase 1 — local dev, no Docker)
 
-**Mac / Linux:**
+The `setup` scripts install backend + frontend deps, run migrations,
+seed a minimal demo user set, and launch both servers.
+
+### macOS / Linux
+
 ```bash
-git clone https://github.com/alrawii2/hospital-management-system.git
-cd hospital-management-system
+git clone https://github.com/mars741/hospital-management-system-.git
+cd hospital-management-system-
+chmod +x setup.sh
 bash setup.sh
 ```
 
-**Windows:**
+### Windows (Command Prompt or PowerShell)
+
 ```bat
-git clone https://github.com/alrawii2/hospital-management-system.git
-cd hospital-management-system
+git clone https://github.com/mars741/hospital-management-system-.git
+cd hospital-management-system-
 .\setup.bat
 ```
 
 The browser opens automatically at <http://localhost:5173>.
 
+> **Manual run** — if you'd rather start each piece yourself, see
+> [How to run manually](#how-to-run-manually) below.
+
 ## Quick start (Phase 2 — full Docker stack)
 
+### macOS / Linux
+
 ```bash
-git clone https://github.com/alrawii2/hospital-management-system.git
-cd hospital-management-system
+git clone https://github.com/mars741/hospital-management-system-.git
+cd hospital-management-system-
 cp deployment/.env.example .env       # then edit secrets
 docker compose -f deployment/docker-compose.yml up --build
 ```
 
+### Windows (Command Prompt)
+
+```bat
+git clone https://github.com/mars741/hospital-management-system-.git
+cd hospital-management-system-
+copy deployment\.env.example .env
+docker compose -f deployment\docker-compose.yml up --build
+```
+
+### Windows (PowerShell)
+
+```powershell
+git clone https://github.com/mars741/hospital-management-system-.git
+cd hospital-management-system-
+Copy-Item deployment\.env.example .env
+docker compose -f deployment\docker-compose.yml up --build
+```
+
 Visit <http://localhost> (port 80). Nginx serves the React build and
 reverse-proxies `/api/*` and `/admin/` to Django.
+
+---
+
+## How to run manually
+
+Skip the `setup` script if you want full control (e.g. you already
+have a virtualenv, or just one of the two servers).
+
+### Backend — Django
+
+**macOS / Linux:**
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py seed_data           # rich demo set (Pass1234!)
+python manage.py runserver 8000
+```
+
+**Windows (PowerShell):**
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py seed_data
+python manage.py runserver 8000
+```
+
+**Windows (Command Prompt):**
+```bat
+python -m venv .venv
+.venv\Scripts\activate.bat
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py seed_data
+python manage.py runserver 8000
+```
+
+> If PowerShell blocks `Activate.ps1` with an execution-policy error, run once:
+> `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
+
+### Frontend — React + Vite
+
+In a second terminal, from the repo root:
+
+**macOS / Linux:**
+```bash
+cd Frontend/hospital-frontend
+npm install
+npm run dev
+```
+
+**Windows (PowerShell or Command Prompt):**
+```bat
+cd Frontend\hospital-frontend
+npm install
+npm run dev
+```
+
+Then open <http://localhost:5173>. The backend must be running at
+`http://localhost:8000` for the frontend to authenticate.
+
+### Running the tests
+
+```bash
+python manage.py test accounts
+```
+
+(Same command on every OS; no extra setup.)
 
 ---
 
