@@ -1,0 +1,33 @@
+@startuml AppointmentLifecycle
+title Process View — Activity: Appointment Lifecycle
+
+start
+
+:Patient submits booking form;
+:Form validation;
+
+if (Valid?) then (yes)
+  :Create Appointment\nstatus = PENDING;
+else (no)
+  :Show errors;
+  stop
+endif
+
+if (Admin / Doctor confirms?) then (yes)
+  :status = CONFIRMED;
+else (no — rejected)
+  :status = CANCELLED;
+  stop
+endif
+
+if (Patient cancels before time?) then (yes)
+  :status = CANCELLED;
+  stop
+else (no)
+  :Visit takes place;
+  :Doctor adds MedicalRecord;
+  :status = COMPLETED;
+  stop
+endif
+
+@enduml

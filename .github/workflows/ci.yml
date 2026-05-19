@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Backend: install deps, run Django checks + tests, build the Docker image.
+  # -------------------------------------------------------------------------
+  backend:
+    name: Backend — checks, tests, build
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB:       hms_test
+          POSTGRES_USER:     hms_user
+          POSTGRES_PASSWORD: hms_test_password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U hms_user -d hms_test"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+
+    env:
+      DJANGO_SECRET_KEY:    ci-secret-key-do-not-use-in-prod
+      DJANGO_DEBUG:         "0"
+      DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1"
+      FIELD_ENCRYPTION_KEY: "Y_WolMvJBPsQBEIukumncmJbB1EWB_SfkwPppvKhkO8="
+      POSTGRES_DB:          hms_test
+      POSTGRES_USER:        hms_user
+      POSTGRES_PASSWORD:    hms_test_password
+      POSTGRES_HOST:        localhost
+      POSTGRES_PORT:        "5432"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Django system checks
+        run: python manage.py check --deploy --fail-level WARNING
+
+      - name: Django tests
+        run: python manage.py test --noinput
+
+      - name: Build backend Docker image (smoke)
+        run: docker build -f deployment/Dockerfile.backend -t hms-backend:ci .
+
+  # -------------------------------------------------------------------------
+  # Frontend: install deps, run lint + build, smoke-build the Docker image.
+  # -------------------------------------------------------------------------
+  frontend:
+    name: Frontend — lint, build, image
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: Frontend/hospital-frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: Frontend/hospital-frontend/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint --if-present
+      - run: npm run build
+
+      - name: Build frontend Docker image (smoke)
+        working-directory: .
+        run: docker build -f deployment/Dockerfile.frontend -t hms-frontend:ci .

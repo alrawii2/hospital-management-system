@@ -1,0 +1,91 @@
+@startuml HospitalPrescriptionWorkflow
+title Hospital Management System — Prescription → Stock → Oversight Workflow\n(Process View, role-based access enforced at every hop)
+
+skinparam sequenceArrowThickness 1
+skinparam shadowing false
+skinparam roundCorner 4
+skinparam noteBackgroundColor #FEFEC8
+
+actor "Doctor\n(doctor_cardio)" as D
+actor "Nurse\n(nurse_cardio)" as N
+actor "Pharmacist\n(pharmacist1)" as P
+actor "Manager\n(manager1)" as M
+
+participant "Controller\n(views.py)" as C
+participant "Permissions\n(permissions.py)" as Perm
+database "ORM + DB\n(Django models)" as DB
+
+== Phase 1 — Doctor prescribes ==
+
+D -> C  : POST /records/<id>/prescribe/\n(drug=Atorvastatin, dosage=20 mg)
+C -> Perm : can_write_prescription(doctor, record)
+Perm --> C : True\n(record.appointment.doctor.user == doctor)
+C -> DB  : INSERT Prescription
+DB --> C : OK (rx_id)
+C --> D  : 302 redirect → /records/<id>/prescribe/\n(POST-redirect-GET; doctor can add more drugs)
+
+note over D, Perm
+  WRITE permission lives in the matrix (§3.5);
+  enforcement is one function call, not scattered if-checks.
+end note
+
+== Phase 2 — Nurse reads (department-scoped) ==
+
+N -> C  : GET /nurse/prescriptions/
+C -> Perm : route guard: role == NURSE
+Perm --> C : OK; nurse.department == Cardiology
+C -> DB  : SELECT Prescription\nWHERE medical_record.appointment.doctor.department == Cardiology
+DB --> C : rows including newly-added Atorvastatin
+C --> N  : render read-only list
+
+note over N
+  Nurse sees the medication but
+  CANNOT modify it — and cannot
+  see Pediatrics or Neurology rows.
+  Department scope is enforced in
+  the ORM filter (defense in depth).
+end note
+
+== Phase 3 — Pharmacist adjusts stock after dispensing ==
+
+P -> C  : POST /pharmacy/stock/<id>/adjust/\n(quantity ← quantity − 10)
+C -> Perm : can_write_drug_stock(pharmacist)
+Perm --> C : True (role == PHARMACIST)
+C -> DB  : UPDATE DrugStock\nWHERE drug=Atorvastatin AND department=Cardiology
+DB --> C : updated row (quantity = 8, reorder_level = 10)
+C --> P  : 302 redirect → /pharmacy/stock/
+
+note right of DB
+  is_low = quantity <= reorder_level
+  Atorvastatin @ Cardiology: 8 ≤ 10 → **LOW**
+  No event bus needed — the dashboard
+  query computes "low" on read.
+end note
+
+== Phase 4 — Manager sees low-stock alert ==
+
+M -> C  : GET /management/
+C -> Perm : can_view_management_dashboard(manager)
+Perm --> C : True (role == MANAGEMENT)
+C -> DB  : SELECT DrugStock\nWHERE quantity <= F('reorder_level')
+DB --> C : rows including Atorvastatin @ Cardiology
+C -> DB  : aggregate Equipment by status
+C -> DB  : aggregate Appointment count by department
+C --> M  : render management dashboard\n(low stock + equipment + appointment volume)
+
+note over M
+  Manager sees aggregate operational state.
+  No PHI — patient names are NEVER joined
+  into the dashboard query (see SAD §3.5).
+end note
+
+== Negative paths (would terminate at the Permissions check) ==
+
+note across
+  • Patient hits any of the URLs above → permissions returns False → controller returns 403
+  • Nurse hits /pharmacy/stock/<id>/adjust/ → can_write_drug_stock returns False → 403
+  • Pharmacist hits /management/ → can_view_management_dashboard returns False → 403
+  Every denial is a uniform 403 via permissions.deny() — no info leakage.
+end note
+
+@enduml

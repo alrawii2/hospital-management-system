@@ -1,0 +1,105 @@
+@startuml HospitalDeploymentView
+title Hospital Management System — Deployment View (Phase 2 Production)
+
+skinparam nodeBackgroundColor #FAFAFA
+skinparam databaseBackgroundColor #F5E8E8
+skinparam cloudBackgroundColor #E8F1FB
+skinparam shadowing false
+skinparam linetype polyline
+
+actor "Hospital Staff /\nPatient (Browser)" as User
+
+cloud "Internet" as Net
+
+node "Load Balancer / Reverse Proxy\n(Nginx 1.25, TLS termination)" as Nginx <<container>> {
+  component "TLS Cert\n(Let's Encrypt)"   as TLS
+  component "Static file server\n(React build)" as Static
+  component "Reverse proxy\n/api/* -> backend" as Proxy
+}
+
+node "Application Server\n(Docker container: backend)" as App <<container>> {
+  component "Gunicorn 21\n4 workers"         as Gunicorn
+  component "Django 5.2 + DRF" as Django
+  component "settings.py\n(env-driven)"       as Conf
+  component "Whitenoise\n(static assets)"     as WN
+}
+
+node "Database Server\n(Docker container: db)" as DB <<container>> {
+  database "PostgreSQL 15\n(volume: hms_db_data)"  as PG
+}
+
+node "Cache / Session\n(Docker container: redis)" as Cache <<container>> {
+  database "Redis 7\n(rate limit + sessions)" as Redis
+}
+
+node "Observability"  as Obs  <<container>> {
+  component "Gunicorn access log"  as Glog
+  component "Django app log"       as Dlog
+  component "PostgreSQL slow log"  as PGlog
+}
+
+node "Developer Workstation\n(local dev, Phase 1)" as Dev <<workstation>> {
+  component "Vite dev server\n:5173" as Vite
+  component "Django dev server\n:8000" as Devd
+  database "SQLite\ndb.sqlite3" as SQLite
+}
+
+' --- Traffic flow (production) ---
+User       -[#0066CC,thickness=2]-> Net  : "HTTPS :443"
+Net        -[#0066CC,thickness=2]-> Nginx
+Nginx      -[#0066CC,thickness=2]-> Static : "/, /assets/* -> React SPA"
+Nginx      -[#0066CC,thickness=2]-> Proxy
+Proxy      -[#0B6E4F,thickness=2]-> Gunicorn : "proxy_pass :8000\n(internal docker network)"
+Gunicorn   -[#0B6E4F]-> Django
+Django     -[#0B6E4F]-> Conf
+Django     -[#0B6E4F]-> WN
+Django     -[#883,thickness=2]-> PG      : "psycopg2 :5432\n(internal docker network)"
+Django     -[#883,thickness=2]-> Redis   : "redis-py :6379"
+Gunicorn   -[#888,dashed]-> Glog
+Django     -[#888,dashed]-> Dlog
+PG         -[#888,dashed]-> PGlog
+
+' --- Dev path (legacy / Phase 1) ---
+Dev        -[#aaa,dashed]-> Vite
+Vite       -[#aaa,dashed]-> Devd : "fetch :8000"
+Devd       -[#aaa,dashed]-> SQLite
+
+note right of Nginx
+  Exposed ports: 80, 443
+  TLS cert auto-renewed via certbot.
+  CORS off (same-origin in prod;
+  React and API share the domain).
+end note
+
+note right of Gunicorn
+  WSGI server, 4 sync workers.
+  Reads ALL settings from env:
+    DJANGO_SECRET_KEY
+    DJANGO_ALLOWED_HOSTS
+    DATABASE_URL
+    FIELD_ENCRYPTION_KEY
+  Volume mount: /app/staticfiles
+end note
+
+note right of PG
+  Volume: hms_db_data (persistent)
+  Daily pg_dump cron -> S3-compatible.
+  Connection pool: 20.
+  No external port (only on docker net).
+end note
+
+note bottom of Dev
+  Phase 1 dev only. In Phase 2 the
+  same docker-compose runs locally
+  with the dev profile, so dev mirrors
+  prod and SQLite is no longer used.
+end note
+
+legend right
+  | = | <color:#0066CC>━</color> | Public HTTPS traffic |
+  | = | <color:#0B6E4F>━</color> | Internal API traffic |
+  | = | <color:#883300>━</color> | DB / cache traffic |
+  | = | <color:#888888>━</color> | Logs (one-way) |
+endlegend
+
+@enduml

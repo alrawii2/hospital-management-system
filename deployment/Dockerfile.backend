@@ -1,0 +1,81 @@
+# syntax=docker/dockerfile:1.6
+# ---------------------------------------------------------------------------
+# Backend image — Django 5 + DRF served by Gunicorn
+# ---------------------------------------------------------------------------
+# Multi-stage build to keep the runtime image small and avoid shipping
+# build toolchains (gcc, dev headers) into production.
+# ---------------------------------------------------------------------------
+
+# ---- Stage 1: builder ----
+FROM python:3.12-slim AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Build dependencies for psycopg2 and cryptography
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        libpq-dev \
+        libffi-dev \
+        libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+COPY requirements.txt .
+RUN pip wheel --wheel-dir /wheels -r requirements.txt
+
+# ---- Stage 2: runtime ----
+FROM python:3.12-slim AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    DJANGO_SETTINGS_MODULE=hospital_project.settings
+
+# Runtime libraries only (no compilers in the runtime image)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libpq5 \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Non-root user — never run Django/Gunicorn as root in production
+RUN groupadd --gid 1001 hms \
+    && useradd  --uid 1001 --gid 1001 --create-home --shell /bin/bash hms
+
+WORKDIR /app
+
+# Install pre-built wheels from the builder stage
+COPY --from=builder /wheels /wheels
+COPY requirements.txt .
+RUN pip install --no-index --find-links=/wheels -r requirements.txt \
+    && rm -rf /wheels
+
+# Application code (owned by the unprivileged user)
+COPY --chown=hms:hms . .
+
+# Static files directory (mounted as a volume in docker-compose so Nginx
+# can serve them too)
+RUN mkdir -p /app/staticfiles /app/media && chown -R hms:hms /app
+
+USER hms
+
+EXPOSE 8000
+
+# Container-level health check (used by docker-compose `healthcheck`)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -fsS http://localhost:8000/api/health/ || exit 1
+
+# Entrypoint runs migrations + collectstatic, then exec's Gunicorn
+COPY --chown=hms:hms deployment/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["gunicorn", "hospital_project.wsgi:application", \
+     "--bind", "0.0.0.0:8000", \
+     "--workers", "4", \
+     "--access-logfile", "-", \
+     "--error-logfile", "-", \
+     "--timeout", "60"]

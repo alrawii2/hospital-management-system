@@ -1,0 +1,113 @@
+@startuml HospitalDevelopmentView
+title Hospital Management System — Development View (Component Diagram)
+
+skinparam componentStyle rectangle
+skinparam linetype ortho
+skinparam shadowing false
+skinparam rectangleBackgroundColor #FAFAFA
+skinparam packageBackgroundColor #F0F4F8
+
+' =====================================================================
+'   FRONTEND TIER (React SPA)
+' =====================================================================
+package "Frontend Tier  —  React 18 SPA (Vite)" #E8F1FB {
+
+  component "App.jsx\n<<root container>>"               as App
+  component "LoginPage.jsx\n<<UC-2>>"                   as LoginPage
+  component "Sidebar.jsx\n<<navigation>>"               as Sidebar
+  component "Dashboard.jsx\n<<UC-3, UC-5>>"             as Dashboard
+  component "BookAppointment.jsx\n<<UC-4>>"             as BookAppt
+  component "ViewAppointments.jsx\n<<UC-5>>"            as ViewAppts
+  component "apiFetch()\n<<HTTP client>>"               as ApiClient
+  component "App.css\n<<design system>>"                as Styles
+
+  App --> LoginPage
+  App --> Sidebar
+  App --> Dashboard
+  App --> BookAppt
+  App --> ViewAppts
+  LoginPage   ..> ApiClient
+  Dashboard   ..> ApiClient
+  BookAppt    ..> ApiClient
+  ViewAppts   ..> ApiClient
+  App         ..> Styles
+}
+
+' =====================================================================
+'   BACKEND TIER (Django REST API)
+' =====================================================================
+package "Backend Tier  —  Django 5 + DRF" #FFF4E0 {
+
+  package "API Layer" #FFF8E8 {
+    component "api_views.py\n<<REST controllers>>"        as ApiViews
+    component "serializers.py\n<<JSON marshalling>>"      as Serializers
+    component "urls.py\n<<URL dispatcher>>"               as Urls
+    component "TokenAuthentication\n<<DRF>>"              as TokenAuth
+  }
+
+  package "Application Layer (Controllers)" #F8FFE8 {
+    component "views.py\n<<template controllers>>"        as Views
+    component "forms.py\n<<input validation>>"            as Forms
+    component "permissions.py\n<<RBAC matrix>>"           as Permissions
+  }
+
+  package "Domain Layer (Model)" #E8F8F0 {
+    component "models.py\n<<15 ORM entities>>"            as Models
+    component "admin.py\n<<admin registrations>>"         as Admin
+    component "migrations/\n<<schema versioning>>"        as Migrations
+    component "Django ORM\n<<framework>>"                 as Orm
+    component "EncryptedField\n<<Fernet AES-128>>"        as Crypto
+  }
+
+  package "Infrastructure Layer" #F0F0F8 {
+    component "settings.py\n<<configuration>>"            as Settings
+    component "CORS middleware"                            as Cors
+    component "Auth middleware"                            as Authm
+  }
+
+  ApiViews   ..> Serializers : uses
+  ApiViews   ..> Permissions : delegates RBAC
+  ApiViews   ..> Models      : ORM queries
+  Serializers ..> Models     : marshalls
+  Views      ..> Forms       : validates
+  Views      ..> Permissions : delegates RBAC
+  Views      ..> Models      : ORM queries
+  Forms      ..> Models      : ModelForm meta
+  Urls       ..> ApiViews    : routes /api/*
+  Urls       ..> Views       : routes HTML
+  TokenAuth  ..> Models      : authenticates User
+  Admin      ..> Models      : registers
+  Models     ..> Orm         : extends
+  Models     ..> Crypto      : encrypts fields
+  Migrations ..> Models      : schema for
+  Settings   ..> Cors
+  Settings   ..> Authm
+  Settings   ..> TokenAuth
+}
+
+' =====================================================================
+'   DATA TIER
+' =====================================================================
+package "Data Tier" #F5E8E8 {
+  database "PostgreSQL 15\n<<Phase 2>>"  as PG
+  database "SQLite 3\n<<Phase 1 dev>>"    as SQLite
+}
+
+' =====================================================================
+'   Cross-tier connections
+' =====================================================================
+ApiClient -[#0066CC,thickness=2]-> Urls : "HTTPS / JSON\n(Token Auth)"
+Orm -[#0B6E4F,thickness=2]-> PG  : "psycopg2\n(prod)"
+Orm -[#888,thickness=1,dashed]-> SQLite : "(dev)"
+
+' =====================================================================
+'   Legend
+' =====================================================================
+legend right
+  | = | Solid = direct call / composition |
+  | = | Dashed = uses / delegates |
+  | <color:#0066CC>━</color> | Cross-tier transport (HTTPS) |
+  | <color:#0B6E4F>━</color> | DB transport (psycopg2) |
+endlegend
+
+@enduml

@@ -1,0 +1,82 @@
+@startuml BookAppointmentSequenceV2
+title Process View — Sequence: Patient Books Appointment (React + REST API)
+
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+skinparam shadowing false
+
+actor Patient
+participant "React SPA\n(LoginPage / BookAppointment)" as React
+participant "apiFetch()\n(Authorization: Token ...)"   as Api
+participant "Django URL Dispatcher\n(urls.py)"          as Url
+participant "TokenAuthentication\n(DRF)"                 as Auth
+participant "api_book_appointment\n(api_views.py)"       as Ctrl
+participant "AppointmentSerializer\n(serializers.py)"    as Ser
+participant "Appointment (Model)\n(models.py)"           as Model
+database "Database\n(PostgreSQL prod / SQLite dev)" as DB
+
+== Load booking page ==
+Patient -> React  : Click "Book Appointment"
+React   -> Api    : apiFetch("/api/doctors/", {}, token)
+Api     -> Url    : GET /api/doctors/  + Token header
+Url     -> Auth   : authenticate(token)
+Auth    -> DB     : SELECT user FROM authtoken_token
+DB      --> Auth  : user instance
+Auth    --> Url   : authenticated request
+Url     -> Ctrl   : api_doctor_list(request)
+Ctrl    -> Model  : Doctor.objects.select_related(...).all()
+Model   -> DB     : SELECT doctor JOIN user JOIN department
+DB      --> Model : rows
+Model   --> Ctrl  : queryset
+Ctrl    -> Ser    : DoctorSerializer(qs, many=True)
+Ser     --> Ctrl  : list[dict]
+Ctrl    --> Url   : Response(200, JSON)
+Url     --> Api   : 200 OK + JSON
+Api     --> React : doctors[]
+React   --> Patient : render dropdown + form
+
+== Submit booking ==
+Patient -> React  : pick doctor, date, time, reason; Submit
+React   -> Api    : apiFetch("/api/appointments/book/<id>/", \nPOST {scheduled_at, reason}, token)
+Api     -> Url    : POST /api/appointments/book/<doctor_id>/
+Url     -> Auth   : authenticate(token)
+Auth    --> Url   : OK
+Url     -> Ctrl   : api_book_appointment(request, doctor_id)
+
+alt user.role == "PATIENT" AND doctor exists AND scheduled_at provided
+    Ctrl  -> Model : Doctor.objects.get(pk=doctor_id)
+    Model -> DB    : SELECT doctor WHERE id=?
+    DB    --> Model: doctor row
+    Ctrl  -> Model : Appointment.objects.create(patient=..., doctor=..., \nscheduled_at=..., reason=..., status="PENDING")
+    Model -> DB    : INSERT INTO appointment (UNIQUE constraint on doctor+scheduled_at)
+    alt no conflict
+        DB     --> Model : OK (id assigned)
+        Model  --> Ctrl  : appointment instance
+        Ctrl   -> Ser    : AppointmentSerializer(appt)
+        Ser    --> Ctrl  : JSON {id, doctor_name, specialty, date, time, status, reason}
+        Ctrl   --> Url   : Response(201, JSON)
+        Url    --> Api   : 201 Created
+        Api    --> React : new appointment object
+        React  -> React  : setAppointments([new, ...prev])
+        React  --> Patient : show success card -> redirect to "My Appointments"
+    else duplicate (doctor double-booked)
+        DB     --> Model : IntegrityError
+        Model  --> Ctrl  : exception
+        Ctrl   --> Url   : Response(400, {"error": "..."} )
+        Url    --> Api   : 400 Bad Request
+        Api    --> React : throw Error
+        React  --> Patient : show inline error, keep form populated
+    end
+else role != PATIENT
+    Ctrl --> Url : Response(403, {"error": "Patients only."})
+    Url  --> Api : 403 Forbidden
+    Api  --> React : throw Error
+    React --> Patient : show "Permission denied"
+else missing scheduled_at
+    Ctrl --> Url : Response(400, {"error": "scheduled_at is required."})
+    Url  --> Api : 400 Bad Request
+    Api  --> React : throw Error
+    React --> Patient : highlight time field
+end
+
+@enduml

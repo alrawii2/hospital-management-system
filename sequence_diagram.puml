@@ -1,0 +1,45 @@
+@startuml BookAppointmentSequence
+title Process View — Sequence: Patient Books Appointment
+
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor Patient
+participant "Browser\n(View — HTML)" as Browser
+participant "BookingController\n(Django view)" as Ctrl
+participant "AppointmentForm" as Form
+participant "Appointment\n(Model)" as Model
+database "Database" as DB
+
+== Display booking page ==
+
+Patient -> Browser : Click "Book"
+Browser -> Ctrl : GET /appointments/book/<doctor_id>/
+Ctrl -> Form : new AppointmentForm()
+Form --> Ctrl : empty form instance
+Ctrl --> Browser : render book.html (form + doctor info)
+Browser --> Patient : show booking form
+
+== Submit booking ==
+
+Patient -> Browser : Fill date/time, reason; click Submit
+Browser -> Ctrl : POST /appointments/book/<doctor_id>/ (form data)
+Ctrl -> Form : AppointmentForm(request.POST)
+Ctrl -> Form : is_valid()
+
+alt form is valid
+    Form --> Ctrl : True
+    Ctrl -> Model : Appointment(patient, doctor, scheduled_at, reason)
+    Ctrl -> Model : save()
+    Model -> DB : INSERT INTO appointments
+    DB --> Model : OK (id assigned)
+    Model --> Ctrl : appointment instance
+    Ctrl --> Browser : 302 redirect → /appointments/my/
+    Browser --> Patient : show "My Appointments" with new entry
+else validation fails OR doctor double-booked
+    Form --> Ctrl : False (errors)
+    Ctrl --> Browser : re-render book.html with errors
+    Browser --> Patient : show errors, re-prompt
+end
+
+@enduml

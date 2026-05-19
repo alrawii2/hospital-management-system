@@ -1,0 +1,231 @@
+@startuml HospitalLogicalView
+title Hospital Management System — Logical View (Class Diagram)
+
+skinparam classAttributeIconSize 0
+skinparam classFontStyle bold
+skinparam linetype ortho
+
+enum Role {
+  PATIENT
+  DOCTOR
+  NURSE
+  PHARMACIST
+  MANAGEMENT
+  ADMIN
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum NurseShift {
+  DAY
+  NIGHT
+  ON_CALL
+}
+
+enum DrugCategory {
+  ANALGESIC
+  ANTIBIOTIC
+  ANTIVIRAL
+  CARDIO
+  ENDOCRINE
+  GI
+  RESP
+  PSYCH
+  OTHER
+}
+
+enum EquipmentStatus {
+  AVAILABLE
+  IN_USE
+  MAINTENANCE
+  RETIRED
+}
+
+class User {
+  + username : String
+  + email : String
+  + first_name : String
+  + last_name : String
+  + role : Role
+  + phone : String
+  --
+  + get_full_name() : String
+}
+
+class Patient {
+  + date_of_birth : Date
+  + gender : Char
+  + blood_type : String
+  + address : String
+}
+
+class Doctor {
+  + specialization : String
+  + license_number : String
+  + years_of_experience : int
+}
+
+class Nurse {
+  + license_number : String
+  + shift : NurseShift
+}
+
+class Pharmacist {
+  + license_number : String
+}
+
+class Manager {
+  + title : String
+}
+
+class Department {
+  + name : String
+  + description : String
+}
+
+class Drug {
+  + name : String
+  + generic_name : String
+  + category : DrugCategory
+  + manufacturer : String
+  + unit : String
+}
+
+class DrugStock {
+  + quantity : int
+  + reorder_level : int
+  + expiry_date : Date
+  + last_updated : DateTime
+  --
+  + is_low() : Boolean
+}
+
+class Equipment {
+  + name : String
+  + model_number : String
+  + manufacturer : String
+  + serial_number : String
+  + status : EquipmentStatus
+  + last_serviced : Date
+}
+
+enum Weekday {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+enum RoomType {
+  CHECKUP
+  OPERATING
+  WARD
+  EXAM
+  ICU
+}
+
+enum RoomStatus {
+  AVAILABLE
+  OCCUPIED
+  MAINTENANCE
+  CLEANING
+}
+
+class DoctorAvailability {
+  + weekday : Weekday
+  + start_time : Time
+  + end_time : Time
+  + slot_minutes : int
+  + active : Boolean
+}
+
+class Room {
+  + number : String
+  + room_type : RoomType
+  + floor : int
+  + capacity : int
+  + status : RoomStatus
+}
+
+class Appointment {
+  + scheduled_at : DateTime
+  + reason : String
+  + status : AppointmentStatus
+  + created_at : DateTime
+  --
+  + is_upcoming() : Boolean
+}
+
+class MedicalRecord {
+  + diagnosis : String
+  + notes : String
+  + treatment : String
+  + created_at : DateTime
+}
+
+class Prescription {
+  + drug_name : String
+  + dosage : String
+  + frequency : String
+  + duration : String
+  + instructions : String
+  + created_at : DateTime
+}
+
+' Relationships
+User "1" -- "0..1" Patient : profile >
+User "1" -- "0..1" Doctor : profile >
+User "1" -- "0..1" Nurse : profile >
+User "1" -- "0..1" Pharmacist : profile >
+User "1" -- "0..1" Manager : profile >
+Department "1" -- "*" Doctor : employs >
+Department "1" -- "*" Nurse : staffs >
+Department "1" -- "*" DrugStock : stocks >
+Department "1" -- "*" Equipment : holds >
+Patient "1" -- "*" Appointment : books >
+Doctor "1" -- "*" Appointment : conducts >
+Appointment "1" -- "0..1" MedicalRecord : produces >
+MedicalRecord "1" -- "*" Prescription : contains >
+Drug "1" -- "*" DrugStock : stocked as >
+Drug "1" -- "*" Prescription : prescribed as >
+Doctor "1" -- "*" DoctorAvailability : keeps >
+Department "1" -- "*" Room : contains >
+
+note right of Nurse
+  Read-only access to
+  Prescriptions, MedicalRecords,
+  DrugStock, and Equipment
+  scoped to the same Department.
+end note
+
+note right of Pharmacist
+  Hospital-wide CRUD on
+  Drug catalog and DrugStock.
+  No access to clinical narrative
+  (MedicalRecord notes/diagnosis).
+end note
+
+note right of Manager
+  Read-only operational oversight:
+  hospital-wide stock, equipment,
+  appointment volume.
+  Cannot write clinical or inventory
+  data; user/dept admin stays with ADMIN.
+end note
+
+note bottom of Prescription
+  Written by Doctor (author of MedicalRecord).
+  Read by Nurse (same Department), Pharmacist (all),
+  Management (all). Patient does NOT see
+  prescriptions in Phase 1.
+end note
+
+@enduml

@@ -1,0 +1,113 @@
+﻿@startuml use_case_diagram
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+
+title Hospital Management System — Use Case Diagram (Phase 1)
+
+actor "Patient" as P
+actor "Doctor" as D
+actor "Nurse" as N
+actor "Pharmacist" as Ph
+actor "Management" as M
+actor "Admin" as A
+
+rectangle "Hospital Management System" {
+
+  package "Authentication" {
+    usecase "UC-1: Register patient account" as UC1
+    usecase "UC-2: Log in" as UC2
+  }
+
+  package "Patient Workflows" {
+    usecase "UC-3: Browse doctors\n(filter by dept/specialization)" as UC3
+    usecase "UC-4: Book appointment" as UC4
+    usecase "UC-5: View my appointments" as UC5
+  }
+
+  package "Clinical Workflows" {
+    usecase "UC-6: View daily schedule" as UC6
+    usecase "UC-7: Add medical record" as UC7
+    usecase "UC-8: Prescribe medication" as UC8
+    usecase "UC-9: View department\nprescriptions" as UC9
+  }
+
+  package "Pharmacy Workflows" {
+    usecase "UC-10: Manage drug catalog" as UC10
+    usecase "UC-11: Adjust drug stock" as UC11
+    usecase "UC-12: View drug stock" as UC12
+  }
+
+  package "Equipment & Oversight" {
+    usecase "UC-13: View equipment" as UC13
+    usecase "UC-14: Update equipment status" as UC14
+    usecase "UC-15: View management\ndashboard / KPIs" as UC15
+  }
+
+  package "Administration" {
+    usecase "UC-16: Manage users,\nprofiles, departments" as UC16
+  }
+
+  package "Phase 2.1 additions" {
+    usecase "UC-17: Cancel my\nappointment" as UC17
+    usecase "UC-18: Manage my\nweekly availability" as UC18
+  }
+}
+
+' Patient
+P --> UC1
+P --> UC2
+P --> UC3
+P --> UC4
+P --> UC5
+P --> UC17
+
+' Doctor
+D --> UC2
+D --> UC6
+D --> UC7
+D --> UC8
+D --> UC12
+D --> UC13
+D --> UC18
+
+' Nurse
+N --> UC2
+N --> UC9
+N --> UC12
+N --> UC13
+
+' Pharmacist
+Ph --> UC2
+Ph --> UC10
+Ph --> UC11
+Ph --> UC12
+
+' Management
+M --> UC2
+M --> UC12
+M --> UC13
+M --> UC14
+M --> UC15
+
+' Admin
+A --> UC1
+A --> UC2
+A --> UC16
+
+' Use case relationships
+UC7 ..> UC8 : <<include>>
+UC4 ..> UC2 : <<include>>
+
+note right of UC15
+  No PHI joins —
+  see SAD §3.5
+end note
+
+note right of UC8
+  Doctor must own
+  the parent record
+  (SAD §2.4 UC-8)
+end note
+
+@enduml

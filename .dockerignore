@@ -1,0 +1,58 @@
+# ---------------------------------------------------------------------------
+# .dockerignore — keep the build context lean so image builds stay fast and
+# secrets/cache files never leak into images.
+# ---------------------------------------------------------------------------
+
+# VCS
+.git/
+.gitignore
+.gitattributes
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.pytest_cache/
+.tox/
+.venv/
+venv/
+env/
+
+# Local DB / state
+db.sqlite3
+db.sqlite3-journal
+
+# Node / frontend
+**/node_modules/
+**/dist/
+**/.vite/
+**/.parcel-cache/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# Build artifacts
+staticfiles/
+media/
+*.log
+
+# Secrets — must never be in an image
+.env
+.env.*
+!.env.example
+
+# Documentation that doesn't belong in the image
+*.docx
+*.pdf
+*.png
+*.jpg
+*.jpeg
+
+# But keep the React favicons and assets that ARE shipped in the build
+!Frontend/hospital-frontend/public/*
+!Frontend/hospital-frontend/src/assets/*

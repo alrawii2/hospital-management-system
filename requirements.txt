@@ -1,0 +1,25 @@
+# Phase 2 production requirements.
+# Pin to known-good versions for reproducibility.
+
+# --- Core framework ---
+Django==5.2.13
+asgiref==3.11.1
+sqlparse==0.5.5
+tzdata==2026.2
+typing_extensions==4.15.0
+
+# --- REST API ---
+djangorestframework==3.15.2
+django-cors-headers==4.3.1
+
+# --- Field-level encryption ---
+django-encrypted-model-fields==0.6.5
+cryptography==47.0.0
+cffi==2.0.0
+pycparser==3.0
+
+# --- Phase 2 production additions ---
+gunicorn==21.2.0           # WSGI app server
+psycopg2-binary==2.9.9     # PostgreSQL driver
+whitenoise==6.7.0          # static file server
+redis==5.0.4               # Django cache backend client
