@@ -1,4 +1,5 @@
 Hospital Management System 🏥
+
 A web-based hospital management system covering patient registration, doctor
 scheduling, appointment booking, medical records, prescriptions, pharmacy
 inventory, equipment tracking, and operational dashboards.
